@@ -1,0 +1,92 @@
+package com.truckstop.producer.example;
+
+
+import com.truckstop.avro.ConnectionInfo;
+import io.confluent.kafka.serializers.AbstractKafkaAvroSerDeConfig;
+import io.confluent.kafka.streams.serdes.avro.SpecificAvroSerde;
+import org.apache.avro.specific.SpecificRecord;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.config.SaslConfigs;
+import org.apache.kafka.common.serialization.Serdes;
+import org.apache.kafka.common.serialization.StringSerializer;
+import org.apache.kafka.streams.StreamsConfig;
+
+import java.io.Serializable;
+import java.util.*;
+
+
+public class SimpleProducerExample implements Serializable {
+
+   private static final long serialVersionUID = 1L;
+   private static final String topicName = "v5.test";
+   private KafkaProducer<String, ConnectionInfo> connectionInfoProducer;
+
+   public static Properties loadProperties() {
+
+      Properties props = new Properties();
+// Comma-separated list of the Confluent Cloud broker endpoints. For example:
+      props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "pkc-4xq5z.us-west-2.aws.confluent.cloud:9092");
+      props.put(StreamsConfig.REPLICATION_FACTOR_CONFIG, 3);
+      props.put(StreamsConfig.SECURITY_PROTOCOL_CONFIG, "SASL_SSL");
+      props.put(SaslConfigs.SASL_MECHANISM, "PLAIN");
+      props.put(SaslConfigs.SASL_JAAS_CONFIG,"org.apache.kafka.common.security.plain.PlainLoginModule required username=\"IND65XUCQ2JQHOTO\" password=\"JJMHu94/4A3t/6J4AQui1AaEicKkvx0zjIJW1e9bQmhWK6nK0fdNIsd59VPR3W/i\";");
+      props.put("key.serializer", StringSerializer.class.getName());
+      props.put("value.serializer", StringSerializer.class.getName());
+      // Recommended performance/resilience settings
+      props.put(StreamsConfig.producerPrefix(ProducerConfig.RETRIES_CONFIG), 2);
+      props.put("producer.confluent.batch.expiry.ms", 92233720);
+      props.put(StreamsConfig.producerPrefix(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG), 300000);
+      props.put(StreamsConfig.producerPrefix(ProducerConfig.MAX_BLOCK_MS_CONFIG), 92233);
+      return props;
+
+   }
+
+
+
+   private static <VT extends SpecificRecord> SpecificAvroSerde<VT> createSerde() {
+
+      final SpecificAvroSerde<VT> serde = new SpecificAvroSerde<>();
+      final Map<String, String> serdeConfig = new HashMap<>();
+      serdeConfig.put(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG,
+            "https://psrc-em82q.us-east-2.aws.confluent.cloud");
+      serdeConfig.put("basic.auth.credentials.source", "USER_INFO");
+      serdeConfig.put("schema.registry.basic.auth.user.info", "2L3FEKH2AZXLPJME:eKpQmQhblRgBSohjQYyA+8nxcNew4JxutHgr6ZKw9qkOO0qbSWy6ri6khbP5pmkC");
+      serde.configure(serdeConfig, false);
+      return serde;
+   }
+
+
+   private void runConnectionInfo(List<ConnectionInfo> connInfoList) throws InterruptedException {
+      final SpecificAvroSerde<ConnectionInfo> connInfoSerde = createSerde();
+
+      connectionInfoProducer = new KafkaProducer<>(loadProperties(), Serdes.String().serializer(),
+            connInfoSerde.serializer());
+
+      connInfoList.forEach(connInfo -> {
+         ProducerRecord<String, ConnectionInfo> record = new ProducerRecord<String, ConnectionInfo>(
+               topicName, connInfo.getConnectionID(), connInfo);
+         connectionInfoProducer.send(record);
+      });
+      connectionInfoProducer.flush();
+   }
+
+
+   public static void main(String[] args) throws InterruptedException {
+      SimpleProducerExample obj = new SimpleProducerExample();
+      List<ConnectionInfo> connInfoList = new ArrayList<ConnectionInfo>();
+      ConnectionInfo connInfo = new ConnectionInfo();
+      connInfo.setConnectionID("05112020113000");
+      connInfo.setServerName("My Machine is running on confluent kafka for Demo_123");
+      connInfo.setHandleID(123);
+      connInfo.setEngineID(100);
+      connInfo.setCreatedOn("05-19-2020");
+      connInfo.setID(1L);
+      connInfo.setSearchScreenVersionID(234);
+      connInfo.setSearchType(45);
+
+      connInfoList.add(connInfo);
+      obj.runConnectionInfo(connInfoList);
+   }
+}
